@@ -41,6 +41,7 @@ import {
   useBackstop,
   useBackstopPool,
   useBackstopPoolUser,
+  useEmitterBackstop,
   useHorizonAccount,
   usePoolMeta,
   useSimulateOperation,
@@ -49,7 +50,7 @@ import {
 import { NOT_BLEND_POOL_ERROR_MESSAGE } from '../hooks/types';
 import { PoolMeta } from '../hooks/types';
 import theme from '../theme';
-import { CometClient } from '../utils/comet';
+import { CometClient, estSingleSidedDeposit } from '../utils/comet';
 import { toBalance, toPercentage } from '../utils/formatter';
 import { BACKSTOP_IDS, isV2Contracts, Version } from '../utils/version';
 
@@ -64,6 +65,9 @@ const LegacyBackstop: React.FC<{ poolMeta: PoolMeta; safePoolId: string }> = ({
     poolMeta.wasmHash === 'a41fc53d6753b6c04eb15b021c55052366a4c8e0e21bc72700f461264ec1350e';
   const { data: loadedBackstop } = useBackstop(poolMeta.version);
   const backstop = loadedBackstop as Backstop | undefined;
+  const isV21 = poolMeta.version === Version.V2_1;
+  const { data: emitterBackstop } = useEmitterBackstop(backstop, isV21);
+  const isV21MigrationPending = isV21 && backstop !== undefined && emitterBackstop !== backstop.id;
   const { data: loadedBackstopPoolData } = useBackstopPool(poolMeta);
   const backstopPoolData = loadedBackstopPoolData as BackstopPool | undefined;
   const { data: loadedUserBackstopPoolData } = useBackstopPoolUser(poolMeta);
@@ -127,7 +131,10 @@ const LegacyBackstop: React.FC<{ poolMeta: PoolMeta; safePoolId: string }> = ({
     data: claimSimResult,
     isLoading: isClaimLoading,
     refetch: refetchClaimSim,
-  } = useSimulateOperation(claimOp, backstop !== undefined && claimOp !== '' && connected);
+  } = useSimulateOperation(
+    claimOp,
+    backstop !== undefined && claimOp !== '' && connected && !isV21MigrationPending
+  );
   const isRestore =
     isClaimLoading === false &&
     claimSimResult !== undefined &&
@@ -153,19 +160,25 @@ const LegacyBackstop: React.FC<{ poolMeta: PoolMeta; safePoolId: string }> = ({
 
   const { data: mintSimResult, refetch: refetchMintSim } = useSimulateOperation(
     lpMintEstOp ?? '',
-    lpMintEstOp !== undefined && !isRestore
+    lpMintEstOp !== undefined && !isRestore && !isV21MigrationPending
   );
-  let lpTokenEmissions: bigint = BigInt(0);
-  if (mintSimResult && rpc.Api.isSimulationSuccess(mintSimResult)) {
-    lpTokenEmissions =
-      parseResult(mintSimResult, (xdrString: string) => {
-        return scValToBigInt(xdr.ScVal.fromXDR(xdrString, 'base64'));
-      }) ?? BigInt(0);
+  let lpTokenEmissions = 0;
+  if (isV21MigrationPending && backstop !== undefined && backstopUserEst !== undefined) {
+    lpTokenEmissions = estSingleSidedDeposit(
+      'blnd',
+      backstop.backstopToken,
+      FixedMath.toFixed(backstopUserEst.emissions, 7)
+    );
+  } else if (mintSimResult && rpc.Api.isSimulationSuccess(mintSimResult)) {
+    const result = parseResult(mintSimResult, (xdrString: string) => {
+      return scValToBigInt(xdr.ScVal.fromXDR(xdrString, 'base64'));
+    });
+    lpTokenEmissions = result === undefined ? 0 : FixedMath.toFloat(result, 7);
   }
 
   const backstopClaimUSD =
     lpTokenEmissions && backstop?.backstopToken.lpTokenPrice
-      ? (Number(lpTokenEmissions) / 1e7) * backstop.backstopToken.lpTokenPrice
+      ? lpTokenEmissions * backstop.backstopToken.lpTokenPrice
       : undefined;
 
   const handleClaimEmissionsClick = async () => {
@@ -187,7 +200,46 @@ const LegacyBackstop: React.FC<{ poolMeta: PoolMeta; safePoolId: string }> = ({
   };
 
   const renderClaimButton = () => {
-    if (!isRestore && !isError)
+    if (isV21MigrationPending)
+      return (
+        <CustomButton
+          disabled
+          sx={{
+            width: '100%',
+            margin: '6px',
+            padding: '12px',
+            color: theme.palette.text.primary,
+            backgroundColor: theme.palette.background.default,
+          }}
+        >
+          <Box sx={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center' }}>
+            <FlameIcon />
+            <Icon
+              src={`/icons/tokens/blndusdclp.svg`}
+              alt={`blndusdclp`}
+              sx={{ height: '30px', width: '30px', marginRight: '12px' }}
+            />
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+              <Box sx={{ display: 'flex', flexDirection: 'row' }}>
+                <Typography variant="h4" sx={{ marginRight: '6px' }}>
+                  {toBalance(lpTokenEmissions)}
+                </Typography>
+                <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
+                  BLND-USDC LP
+                </Typography>
+              </Box>
+              <Typography variant="body2" sx={{ color: theme.palette.text.primary }}>
+                {`$${toBalance(backstopClaimUSD)}`}
+              </Typography>
+              <Typography variant="body2" sx={{ color: theme.palette.warning.main }}>
+                Pending emitter migration
+              </Typography>
+            </Box>
+          </Box>
+          <ArrowForwardIcon fontSize="inherit" />
+        </CustomButton>
+      );
+    else if (!isRestore && !isError)
       return (
         <CustomButton
           sx={{
@@ -212,7 +264,7 @@ const LegacyBackstop: React.FC<{ poolMeta: PoolMeta; safePoolId: string }> = ({
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
               <Box sx={{ display: 'flex', flexDirection: 'row' }}>
                 <Typography variant="h4" sx={{ marginRight: '6px' }}>
-                  {toBalance(lpTokenEmissions, 7)}
+                  {toBalance(lpTokenEmissions)}
                 </Typography>
                 <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
                   BLND-USDC LP
@@ -399,7 +451,7 @@ const LegacyBackstop: React.FC<{ poolMeta: PoolMeta; safePoolId: string }> = ({
           </Section>
         </Row>
       )}
-      {!isRestore && lpTokenEmissions !== undefined && lpTokenEmissions > BigInt(0) && (
+      {!isRestore && ((connected && isV21MigrationPending) || lpTokenEmissions > 0) && (
         <Row>
           <Section
             width={SectionSize.FULL}

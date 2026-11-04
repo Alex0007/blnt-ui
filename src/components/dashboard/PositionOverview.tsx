@@ -12,7 +12,9 @@ import { rpc } from '@stellar/stellar-sdk';
 import { useSettings, ViewType } from '../../contexts';
 import { useWallet } from '../../contexts/wallet';
 import {
+  useBackstop,
   useBackstopPool,
+  useEmitterBackstop,
   useHorizonAccount,
   usePool,
   usePoolMeta,
@@ -40,6 +42,10 @@ export const PositionOverview: React.FC<PoolComponentProps> = ({ poolId }) => {
 
   const { data: poolMeta } = usePoolMeta(poolId);
   const isV3 = poolMeta?.version === Version.V3;
+  const isV21 = poolMeta?.version === Version.V2_1;
+  const { data: backstop } = useBackstop(poolMeta?.version, isV21);
+  const { data: emitterBackstop } = useEmitterBackstop(backstop, isV21);
+  const isV21MigrationPending = isV21 && backstop !== undefined && emitterBackstop !== backstop.id;
   const emissionsAsset = isV3 ? BLNT_ASSET : BLND_ASSET;
   const { data: loadedBackstopPool } = useBackstopPool(poolMeta, isV3);
   const backstopPoolV3 =
@@ -73,7 +79,11 @@ export const PositionOverview: React.FC<PoolComponentProps> = ({ poolId }) => {
     refetch: refetchSim,
   } = useSimulateOperation(
     sim_op,
-    showPoolEmissionsClaim && claimedTokens.length > 0 && sim_op !== '' && connected
+    showPoolEmissionsClaim &&
+      claimedTokens.length > 0 &&
+      sim_op !== '' &&
+      connected &&
+      !isV21MigrationPending
   );
 
   if (pool === undefined || userPoolData === undefined) {
@@ -118,7 +128,38 @@ export const PositionOverview: React.FC<PoolComponentProps> = ({ poolId }) => {
   };
 
   function renderClaimButton() {
-    if (hasEmissionsTrustline && !isRestore && !isError) {
+    if (isV21MigrationPending) {
+      return (
+        <Box sx={{ width: '100%' }}>
+          <CustomButton
+            disabled
+            sx={{
+              width: '100%',
+              padding: '12px',
+              color: theme.palette.text.primary,
+              backgroundColor: theme.palette.background.paper,
+            }}
+          >
+            <Box sx={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center' }}>
+              <FlameIcon />
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                <StackedText
+                  title="Claim Pool Emissions"
+                  titleColor="inherit"
+                  text={`${toBalance(emissions)} ${emissionsAsset.code}`}
+                  textColor="inherit"
+                  type="large"
+                />
+                <Typography variant="body2" color={theme.palette.warning.main}>
+                  Pending emitter migration
+                </Typography>
+              </Box>
+            </Box>
+            <ArrowForwardIcon fontSize="inherit" />
+          </CustomButton>
+        </Box>
+      );
+    } else if (hasEmissionsTrustline && !isRestore && !isError) {
       return (
         <CustomButton
           sx={{
