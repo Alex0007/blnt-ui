@@ -6,7 +6,6 @@ import { useRouter } from 'next/router';
 import { BackstopPreviewBar } from '../components/backstop/BackstopPreviewBar';
 import { BorrowMarketList } from '../components/borrow/BorrowMarketList';
 import { BorrowPositionList } from '../components/borrow/BorrowPositionList';
-import { AllbridgeButton } from '../components/bridge/allbridge';
 import { Divider } from '../components/common/Divider';
 import { Row } from '../components/common/Row';
 import { Section, SectionSize } from '../components/common/Section';
@@ -22,7 +21,6 @@ import { useSettings } from '../contexts';
 import { usePool, usePoolMeta, usePoolOracle, usePoolUser } from '../hooks/api';
 import { NOT_BLEND_POOL_ERROR_MESSAGE } from '../hooks/types';
 import { toBalance } from '../utils/formatter';
-import { MAINNET_USDC_CONTRACT_ADDRESS } from '../utils/token_display';
 
 const Dashboard: NextPage = () => {
   const router = useRouter();
@@ -75,10 +73,6 @@ const Dashboard: NextPage = () => {
     <>
       <PoolHealthBanner poolId={safePoolId} />
       <PoolExploreBar poolId={safePoolId} />
-      {pool &&
-        Array.from(pool.reserves.keys()).some(
-          (assetId) => assetId === MAINNET_USDC_CONTRACT_ADDRESS
-        ) && <AllbridgeButton />}
       <Divider />
       <BackstopPreviewBar poolId={safePoolId} />
       <Divider />
