@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { OpaqueButton } from './OpaqueButton';
 import { TOS } from './TOS';
 
-const TOS_VERSION = '2026-08-31';
+const TOS_VERSION = '2026-11-05';
 
 export const OverlayModalTOS: React.FC = () => {
   const theme = useTheme();
