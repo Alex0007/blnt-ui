@@ -10,6 +10,7 @@ import {
 } from '../../hooks/api';
 import { estSingleSidedDeposit } from '../../utils/comet';
 import { getBackstopEmissionsAprV3, getBackstopPoolMetrics } from '../../utils/backstop';
+import { Version } from '../../utils/version';
 import { PoolComponentProps } from '../common/PoolComponentProps';
 import { RateDisplay } from '../common/RateDisplay';
 import { StackedText } from '../common/StackedText';
@@ -25,11 +26,13 @@ export const BackstopAPR: React.FC<PoolComponentProps> = ({ poolId }) => {
   const { data: secondLossToken } = useBackstopTierTokenV3(BackstopTierV3.SecondLoss, poolMeta);
   const { data: thirdLossToken } = useBackstopTierTokenV3(BackstopTierV3.ThirdLoss, poolMeta);
 
-  let estBackstopApr: number | undefined = undefined;
-  let backstopEmissionsApr: number | undefined = undefined;
+  const suppressLegacyApr = poolMeta?.version === Version.V1 || poolMeta?.version === Version.V2;
+  let estBackstopApr: number | undefined = suppressLegacyApr ? 0 : undefined;
+  let backstopEmissionsApr: number | undefined = suppressLegacyApr ? 0 : undefined;
   const isV3 = backstopPoolData instanceof BackstopPoolV3;
 
   if (
+    !suppressLegacyApr &&
     pool !== undefined &&
     poolOracle !== undefined &&
     backstop !== undefined &&
