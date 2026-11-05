@@ -52,6 +52,42 @@ function backstopV2Id(poolMeta: PoolMeta): string {
 }
 
 const WALLET_CONNECT_ID = 'wallet_connect';
+const SOROBAN_INSTRUCTION_LEEWAY_PERCENT = BigInt(15);
+const PERCENT_SCALAR = BigInt(100);
+
+// A simulation can use a same-ledger reserve shortcut while execution in a later
+// ledger must accrue interest. Keep enough instruction and fee headroom for the
+// more expensive path without changing the simulated footprint.
+function addSorobanInstructionLeeway(transaction: Transaction): Transaction {
+  const sorobanData = transaction.toEnvelope().v1().tx().ext().sorobanData();
+  const resources = sorobanData.resources();
+  const instructions = BigInt(resources.instructions());
+  const resourceFee = sorobanData.resourceFee().toBigInt();
+  const totalFee = BigInt(transaction.fee);
+
+  if (resourceFee > totalFee) {
+    throw new Error('Soroban resource fee exceeds the transaction fee.');
+  }
+
+  const paddedInstructions =
+    (instructions * (PERCENT_SCALAR + SOROBAN_INSTRUCTION_LEEWAY_PERCENT) +
+      PERCENT_SCALAR -
+      BigInt(1)) /
+    PERCENT_SCALAR;
+  const paddedResourceFee =
+    (resourceFee * (PERCENT_SCALAR + SOROBAN_INSTRUCTION_LEEWAY_PERCENT) +
+      PERCENT_SCALAR -
+      BigInt(1)) /
+    PERCENT_SCALAR;
+
+  resources.instructions(Number(paddedInstructions));
+  sorobanData.resourceFee(xdr.Int64.fromString(paddedResourceFee.toString()));
+
+  return TransactionBuilder.cloneFrom(transaction, {
+    fee: (totalFee - resourceFee).toString(),
+    sorobanData,
+  }).build();
+}
 
 export interface IWalletContext {
   connected: boolean;
@@ -488,18 +524,11 @@ export const WalletProvider: React.FC<React.PropsWithChildren> = ({ children }) 
     }
   }
 
-  async function simulateOperation(
-    operation: xdr.Operation
+  async function simulateTransaction(
+    transaction: Transaction
   ): Promise<rpc.Api.SimulateTransactionResponse> {
     try {
       setLoading(true);
-      const account = await stellarRpc.getAccount(walletAddress);
-      const tx_builder = new TransactionBuilder(account, {
-        networkPassphrase: network.passphrase,
-        fee: txInclusionFee.fee,
-        timebounds: { minTime: 0, maxTime: Math.floor(Date.now() / 1000) + 2 * 60 * 1000 },
-      }).addOperation(operation);
-      const transaction = tx_builder.build();
       const simulation = await stellarRpc.simulateTransaction(transaction);
       setLoading(false);
       return simulation;
@@ -507,6 +536,20 @@ export const WalletProvider: React.FC<React.PropsWithChildren> = ({ children }) 
       setLoading(false);
       throw e;
     }
+  }
+
+  async function simulateOperation(
+    operation: xdr.Operation
+  ): Promise<rpc.Api.SimulateTransactionResponse> {
+    const account = await stellarRpc.getAccount(walletAddress);
+    const transaction = new TransactionBuilder(account, {
+      networkPassphrase: network.passphrase,
+      fee: txInclusionFee.fee,
+      timebounds: { minTime: 0, maxTime: Math.floor(Date.now() / 1000) + 2 * 60 * 1000 },
+    })
+      .addOperation(operation)
+      .build();
+    return await simulateTransaction(transaction);
   }
 
   async function invokeSorobanOperation<T>(operation: xdr.Operation) {
@@ -518,9 +561,10 @@ export const WalletProvider: React.FC<React.PropsWithChildren> = ({ children }) 
         timebounds: { minTime: 0, maxTime: Math.floor(Date.now() / 1000) + 2 * 60 * 1000 },
       }).addOperation(operation);
       const transaction = tx_builder.build();
-      const simResponse = await simulateOperation(operation);
+      const simResponse = await simulateTransaction(transaction);
       const assembled_tx = rpc.assembleTransaction(transaction, simResponse).build();
-      const extended_tx = addReflectorEntries(assembled_tx.toXDR());
+      const padded_tx = addSorobanInstructionLeeway(assembled_tx);
+      const extended_tx = addReflectorEntries(padded_tx.toXDR());
       console.log('Sending transaction to wallet: ', extended_tx);
       const signedTx = await sign(extended_tx);
       const tx = new Transaction(signedTx, network.passphrase);
