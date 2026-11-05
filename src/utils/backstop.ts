@@ -11,6 +11,8 @@ import {
   BackstopTierV3,
   BackstopToken,
   FixedMath,
+  PoolEstimate,
+  activeBackstopTierSharesV3,
   annualizedBackstopEmissionV3,
 } from '@blend-capital/blend-sdk';
 import { estSingleSidedDeposit } from './comet';
@@ -21,6 +23,82 @@ export interface BackstopPoolMetrics {
 }
 
 export type BackstopTierTokensV3 = Partial<Record<BackstopTierV3, BackstopToken>>;
+export type BackstopTierRatesV3 = Partial<Record<BackstopTierV3, number | undefined>>;
+
+/** Estimate the annual pool interest allocated to all backstop tiers. */
+export function getAnnualBackstopInterestValue(
+  backstopRate: number,
+  poolEstimate: PoolEstimate
+): number {
+  return (
+    FixedMath.toFloat(BigInt(backstopRate), 7) *
+    poolEstimate.avgBorrowApy *
+    poolEstimate.totalBorrowed
+  );
+}
+
+/**
+ * Estimate each v3 tier's interest APY using the contract's weighted-value
+ * allocation formula. Queued shares remain eligible for interest allocation.
+ */
+export function getBackstopTierInterestApysV3(
+  pool: BackstopPoolV3,
+  annualInterestValue: number | undefined
+): BackstopTierRatesV3 {
+  const result: BackstopTierRatesV3 = {};
+  if (annualInterestValue === undefined) return result;
+
+  const weightedValue = pool.configuredTiers.reduce((total, tier) => {
+    const tierData = pool.tier(tier).data;
+    return (
+      total +
+      FixedMath.toFloat(tierData.value, 7) *
+        (tierData.value > BigInt(0) ? tierData.take_rate_weight : 0)
+    );
+  }, 0);
+
+  for (const tier of pool.configuredTiers) {
+    const tierData = pool.tier(tier).data;
+    result[tier] =
+      tierData.value > BigInt(0) && weightedValue > 0
+        ? (annualInterestValue * tierData.take_rate_weight) / weightedValue
+        : 0;
+  }
+  return result;
+}
+
+/** Estimate one v3 tier's BLNT emissions APY over its active, non-Q4W value. */
+export function getBackstopTierEmissionsApyV3(
+  pool: BackstopPoolV3,
+  tier: BackstopTierV3,
+  emissions: BackstopPoolEmissionsV3 | undefined,
+  tierToken: BackstopToken | undefined
+): number | undefined {
+  const tierPool = pool.tier(tier);
+  const tierData = tierPool.data;
+  if (!tierData.blnt_emission_eligible) return 0;
+  if (emissions === undefined || tierToken === undefined) return undefined;
+
+  const annualBlnt = annualizedBackstopEmissionV3(emissions.by_tier[tier]);
+  const activeShares = activeBackstopTierSharesV3(emissions.pool_balance_by_tier[tier]);
+  if (
+    annualBlnt === BigInt(0) ||
+    activeShares === BigInt(0) ||
+    tierData.tokens === BigInt(0) ||
+    tierData.shares === BigInt(0)
+  ) {
+    return 0;
+  }
+
+  const activeTokens = tierPool.sharesToTokens(activeShares);
+  const activeValue = FixedMath.toFloat((activeTokens * tierData.value) / tierData.tokens, 7);
+  if (activeValue <= 0) return 0;
+
+  const annualLpTokens = estSingleSidedDeposit('blnd', tierToken, annualBlnt);
+  const tierTokenValue =
+    FixedMath.toFloat(tierData.value, 7) / FixedMath.toFloat(tierData.tokens, 7);
+  return (annualLpTokens * tierTokenValue) / activeValue;
+}
 
 /**
  * Estimate the pool-wide v3 backstop emissions APY at current stream and Comet prices.

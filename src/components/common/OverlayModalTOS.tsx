@@ -51,7 +51,7 @@ export const OverlayModalTOS: React.FC = () => {
             }}
           >
             <Typography variant="h2" sx={{ margin: '12px' }}>
-              BLNT.trade Website and Interface Terms of Use
+              BLNT Trade Website and Interface Terms of Use
             </Typography>
             <Box
               sx={{

@@ -30,9 +30,9 @@ export const TOS = () => {
         <Link href="https://blnt.trade" target="_blank" rel="noreferrer">
           https://blnt.trade
         </Link>{' '}
-        and any subdomains operated by BLNT Protocol LLC (collectively, the “Site”). BLNT Protocol
-        is an open-source project. The Site is made available by BLNT Protocol LLC, a Colorado
-        limited liability company (“Operator,” “we,” “us,” or “our”).
+        and any subdomains (collectively, the “Site”). BLNT Protocol is an open-source project. The
+        Site is branded as BLNT Trade and made available by BLNT Protocol LLC, a Colorado limited
+        liability company doing business as BLNT Trade (“Operator,” “we,” “us,” or “our”).
       </Paragraph>
 
       <Paragraph>
@@ -138,8 +138,8 @@ export const TOS = () => {
       <Paragraph>
         Source code used by the Site is available under the licenses identified in its repositories.
         Those licenses, rather than these Terms, control copying, modification, and distribution of
-        that code. You must not use the BLNT Protocol name or project identity to falsely claim
-        endorsement, sponsorship, or affiliation.
+        that code. You must not use the BLNT Protocol or BLNT Trade name or project identity to
+        falsely claim endorsement, sponsorship, or affiliation.
       </Paragraph>
 
       <SectionHeading>8. Availability and changes</SectionHeading>

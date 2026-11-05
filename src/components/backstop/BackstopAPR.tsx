@@ -9,7 +9,11 @@ import {
   usePoolOracle,
 } from '../../hooks/api';
 import { estSingleSidedDeposit } from '../../utils/comet';
-import { getBackstopEmissionsAprV3, getBackstopPoolMetrics } from '../../utils/backstop';
+import {
+  getAnnualBackstopInterestValue,
+  getBackstopEmissionsAprV3,
+  getBackstopPoolMetrics,
+} from '../../utils/backstop';
 import { Version } from '../../utils/version';
 import { PoolComponentProps } from '../common/PoolComponentProps';
 import { RateDisplay } from '../common/RateDisplay';
@@ -42,9 +46,7 @@ export const BackstopAPR: React.FC<PoolComponentProps> = ({ poolId }) => {
     const backstopPoolEst = getBackstopPoolMetrics(backstop, backstopPoolData);
     if (backstopPoolEst.totalSpotValue > 0) {
       estBackstopApr =
-        (FixedMath.toFloat(BigInt(pool.metadata.backstopRate), 7) *
-          poolEst.avgBorrowApy *
-          poolEst.totalBorrowed) /
+        getAnnualBackstopInterestValue(pool.metadata.backstopRate, poolEst) /
         backstopPoolEst.totalSpotValue;
     }
     if (isV3) {

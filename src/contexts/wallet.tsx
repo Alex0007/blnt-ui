@@ -233,11 +233,11 @@ async function initializeWalletKit(): Promise<WalletKit> {
     walletConnectModule = new WalletConnectModule({
       projectId: '054187587f6dfcce94d7e2c799aa9c58',
       metadata: {
-        name: process.env.NEXT_PUBLIC_WALLET_CONNECT_NAME ?? 'Blend',
-        description: `Blend is a liquidity protocol primitive, enabling the creation of money markets for any use case.`,
+        name: process.env.NEXT_PUBLIC_WALLET_CONNECT_NAME ?? 'BLNT Trade',
+        description: `BLNT Trade is a web interface for BLNT V3 and supported Blend markets on Stellar.`,
         url: process.env.NEXT_PUBLIC_WALLET_CONNECT_URL ?? 'https://blnt.trade',
         icons: [
-          'https://docs.blnt.trade/~gitbook/image?url=https%3A%2F%2F3627113658-files.gitbook.io%2F%7E%2Ffiles%2Fv0%2Fb%2Fgitbook-x-prod.appspot.com%2Fo%2Fspaces%252FlsteMPgIzWJ2y9ruiTJy%252Fuploads%252FVsvCoCALpHWAw8LpU12e%252FBlend%2520Logo%25403x.png%3Falt%3Dmedia%26token%3De8c06118-43b7-4ddd-9580-6c0fc47ce971&width=768&dpr=2&quality=100&sign=f4bb7bc2&sv=1',
+          'https://blnt.trade/icon-512x512.png',
         ],
       },
       allowedChains: [

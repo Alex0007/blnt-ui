@@ -6,6 +6,7 @@ import {
   BackstopPoolV3,
   BackstopTierV3,
   FixedMath,
+  PoolEstimate,
   parseError,
   parseResult,
 } from '@blend-capital/blend-sdk';
@@ -15,14 +16,24 @@ import { rpc } from '@stellar/stellar-sdk';
 import { useWallet } from '../../contexts/wallet';
 import {
   useBackstopPool,
+  useBackstopPoolEmissionsV3,
   useBackstopPoolUser,
+  useBackstopTierTokenV3,
   useHorizonAccount,
+  usePool,
+  usePoolOracle,
   useSimulateOperation,
   useTokenBalance,
 } from '../../hooks/api';
 import { PoolMeta } from '../../hooks/types';
 import theme from '../../theme';
-import { getTierIcon, getTierLabel } from '../../utils/backstop';
+import {
+  getAnnualBackstopInterestValue,
+  getBackstopTierEmissionsApyV3,
+  getBackstopTierInterestApysV3,
+  getTierIcon,
+  getTierLabel,
+} from '../../utils/backstop';
 import { toBalance, toPercentage } from '../../utils/formatter';
 import { CustomButton } from '../common/CustomButton';
 import { Divider } from '../common/Divider';
@@ -30,6 +41,7 @@ import { FlameIcon } from '../common/FlameIcon';
 import { Icon } from '../common/Icon';
 import { LinkBox } from '../common/LinkBox';
 import { OpaqueButton } from '../common/OpaqueButton';
+import { RateDisplay } from '../common/RateDisplay';
 import { Row } from '../common/Row';
 import { Section, SectionSize } from '../common/Section';
 import { SectionBase } from '../common/SectionBase';
@@ -178,9 +190,19 @@ interface V3TierCardProps {
   user: BackstopPoolUserV3 | undefined;
   tier: BackstopTierV3;
   walletBalance: bigint | undefined;
+  interestApy: number | undefined;
+  emissionsApy: number | undefined;
 }
 
-const V3TierCard: React.FC<V3TierCardProps> = ({ poolMeta, pool, user, tier, walletBalance }) => {
+const V3TierCard: React.FC<V3TierCardProps> = ({
+  poolMeta,
+  pool,
+  user,
+  tier,
+  walletBalance,
+  interestApy,
+  emissionsApy,
+}) => {
   const tierPool = pool.tier(tier);
   const tierLabel = getTierLabel(tier, tierPool.data.token, tierPool.data.asset);
   const userBalance = user?.balance(tier);
@@ -215,30 +237,85 @@ const V3TierCard: React.FC<V3TierCardProps> = ({ poolMeta, pool, user, tier, wal
 
   return (
     <Section width={SectionSize.FULL} sx={{ flexDirection: 'column', marginBottom: '12px' }}>
-      <Row sx={{ alignItems: 'center', padding: '12px' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', width: '33.33%' }}>
-          <Icon
-            src={getTierIcon(tier, tierPool.data.token, tierPool.data.asset)}
-            alt={tierLabel}
-            sx={{ height: '30px', width: '30px', marginRight: '12px' }}
-          />
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-            <Typography variant="h4">{tierLabel}</Typography>
-            <BackstopAuthorizationStatus tierPool={tierPool} sx={{ marginTop: '2px' }} />
+      <Row sx={{ alignItems: 'flex-start' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-start',
+            width: SectionSize.THIRD,
+            margin: '6px',
+            padding: '6px',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+            <Icon
+              src={getTierIcon(tier, tierPool.data.token, tierPool.data.asset)}
+              alt={tierLabel}
+              sx={{ height: '30px', width: '30px', marginRight: '12px' }}
+            />
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+              <Typography variant="h4">{tierLabel}</Typography>
+              <BackstopAuthorizationStatus tierPool={tierPool} sx={{ marginTop: '2px' }} />
+            </Box>
           </Box>
+          <StackedText
+            title="Tier APR"
+            text={
+              interestApy !== undefined ? (
+                <RateDisplay
+                  assetSymbol={tierLabel}
+                  assetRate={interestApy}
+                  emissionSymbol="BLNT LP"
+                  emissionApr={emissionsApy}
+                  rateType="earned"
+                  direction="horizontal"
+                />
+              ) : (
+                ''
+              )
+            }
+            sx={{ marginTop: '12px' }}
+            tooltip="Estimated APR from tier interest sharing and BLNT emissions."
+          />
         </Box>
-        <Box sx={{ textAlign: 'center', width: '33.33%' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-start',
+            textAlign: 'left',
+            width: SectionSize.THIRD,
+            margin: '6px',
+            padding: '6px',
+          }}
+        >
           <Typography variant="body2" color={theme.palette.text.secondary}>
             {lossTierLabel}
           </Typography>
           <Typography variant="body2" color={theme.palette.text.secondary}>
             Weight: {weightPercentage}
           </Typography>
+          <StackedText
+            title="Tier Total"
+            text={`$${toBalance(FixedMath.toFloat(tierPool.data.value, 7))}`}
+            sx={{ width: '100%', marginTop: '12px' }}
+            tooltip="Current value deposited in this tier, including capital queued for withdrawal."
+          />
         </Box>
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', width: '33.33%' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'stretch',
+            width: SectionSize.THIRD,
+            margin: '6px',
+            padding: '6px',
+          }}
+        >
           {canManage && (
             <LinkBox
-              sx={{ width: '100%', maxWidth: '140px' }}
+              sx={{ width: '100%' }}
               to={{ pathname: '/backstop-token', query: { poolId: poolMeta.id, tier } }}
             >
               <OpaqueButton palette={theme.palette.primary} sx={{ width: '100%', padding: '6px' }}>
@@ -258,7 +335,7 @@ const V3TierCard: React.FC<V3TierCardProps> = ({ poolMeta, pool, user, tier, wal
           value={walletValue}
         />
         <V3TierBalanceCard
-          title="Backstop deposit"
+          title="Backstop Position"
           tier={tier}
           token={tierPool.data.token}
           asset={tierPool.data.asset}
@@ -334,6 +411,12 @@ export const BackstopV3View: React.FC<{ poolMeta: PoolMeta }> = ({ poolMeta }) =
   const hasEmissionEligibleTier = emissionEligibleTiers.length > 0;
   const { data: loadedUser } = useBackstopPoolUser(poolMeta);
   const { data: horizonAccount } = useHorizonAccount();
+  const { data: lendingPool } = usePool(poolMeta);
+  const { data: poolOracle } = usePoolOracle(lendingPool);
+  const { data: emissions } = useBackstopPoolEmissionsV3(poolMeta);
+  const { data: firstLossToken } = useBackstopTierTokenV3(BackstopTierV3.FirstLoss, poolMeta);
+  const { data: secondLossToken } = useBackstopTierTokenV3(BackstopTierV3.SecondLoss, poolMeta);
+  const { data: thirdLossToken } = useBackstopTierTokenV3(BackstopTierV3.ThirdLoss, poolMeta);
   const user = loadedUser instanceof BackstopPoolUserV3 ? loadedUser : undefined;
   const { data: firstLossBalance } = useTokenBalance(
     pool?.tiers[BackstopTierV3.FirstLoss]?.data.token,
@@ -357,6 +440,19 @@ export const BackstopV3View: React.FC<{ poolMeta: PoolMeta }> = ({ poolMeta }) =
     [BackstopTierV3.SecondLoss]: connected ? secondLossBalance : BigInt(0),
     [BackstopTierV3.ThirdLoss]: connected ? thirdLossBalance : BigInt(0),
   };
+  const tierTokens = {
+    [BackstopTierV3.FirstLoss]: firstLossToken,
+    [BackstopTierV3.SecondLoss]: secondLossToken,
+    [BackstopTierV3.ThirdLoss]: thirdLossToken,
+  };
+  const annualInterestValue =
+    lendingPool !== undefined && poolOracle !== undefined
+      ? getAnnualBackstopInterestValue(
+          lendingPool.metadata.backstopRate,
+          PoolEstimate.build(lendingPool.reserves, poolOracle)
+        )
+      : undefined;
+  const interestApys = getBackstopTierInterestApysV3(pool, annualInterestValue);
 
   return (
     <>
@@ -390,10 +486,7 @@ export const BackstopV3View: React.FC<{ poolMeta: PoolMeta }> = ({ poolMeta }) =
       </Row>
       {hasEmissionEligibleTier && (
         <Row>
-          <Section
-            width={SectionSize.FULL}
-            sx={{ flexDirection: 'column', paddingTop: '12px' }}
-          >
+          <Section width={SectionSize.FULL} sx={{ flexDirection: 'column', paddingTop: '12px' }}>
             <Typography variant="body2" sx={{ margin: '6px' }}>
               Emissions to claim
             </Typography>
@@ -422,6 +515,8 @@ export const BackstopV3View: React.FC<{ poolMeta: PoolMeta }> = ({ poolMeta }) =
           user={user}
           tier={tier}
           walletBalance={walletBalances[tier]}
+          interestApy={interestApys[tier]}
+          emissionsApy={getBackstopTierEmissionsApyV3(pool, tier, emissions, tierTokens[tier])}
         />
       ))}
     </>
