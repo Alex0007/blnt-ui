@@ -59,9 +59,13 @@ export const MarketsList: React.FC<MarketListProps> = ({ version }) => {
     () => configuredPools.filter((pool) => pool.version === version).map((pool) => pool.id),
     [configuredPools, version]
   );
+  const configuredPoolsOnly = process.env.NEXT_PUBLIC_CONFIGURED_POOLS_ONLY === 'true';
   const visiblePoolIds = useMemo(
-    () => Array.from(new Set([...rewardZone, ...configuredPoolIds])),
-    [rewardZone, configuredPoolIds]
+    () =>
+      configuredPoolsOnly && configuredPoolIds.length > 0
+        ? configuredPoolIds
+        : Array.from(new Set([...rewardZone, ...configuredPoolIds])),
+    [rewardZone, configuredPoolIds, configuredPoolsOnly]
   );
   const safeRewardZone = useMemo(
     () => visiblePoolIds.filter((poolId) => !blockedPools.includes(poolId)),
