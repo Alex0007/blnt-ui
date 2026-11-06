@@ -288,6 +288,7 @@ const V3TierCard: React.FC<V3TierCardProps> = ({
             width: SectionSize.THIRD,
             margin: '6px',
             padding: '6px',
+            paddingLeft: '18px',
           }}
         >
           <Typography variant="body2" color={theme.palette.text.secondary}>
