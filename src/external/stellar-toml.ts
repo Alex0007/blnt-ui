@@ -55,6 +55,14 @@ export async function getTokenMetadataFromTOML(
         domain: 'circle.com',
         image: `https://www.circle.com/usdc-icon`,
       };
+    } else if (
+      assetCode === 'USDT0' &&
+      assetIssuer === 'GATISXX6BZ6NC7IKQBY37CJD4SOZL3CYZJWXEDG6JVIY4WBS6KXJHN6Q'
+    ) {
+      return {
+        domain: 'usdt0.to',
+        image: '/icons/tokens/usdt0.png',
+      };
     }
     try {
       const cachedData = localStorage.getItem(assetId);
