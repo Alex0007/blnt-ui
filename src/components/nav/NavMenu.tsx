@@ -80,15 +80,17 @@ export const NavMenu = () => {
               <OpenInNewIcon fontSize="inherit" />
             </MenuItem>
           </a>
-          <a href="https://discord.gg/Baza8FXzzT" target="_blank" rel="noreferrer">
-            <MenuItem
-              onClick={handleClose}
-              sx={{ color: '#FFFFFF', justifyContent: 'space-between' }}
-            >
-              <Typography>Discord</Typography>
-              <OpenInNewIcon fontSize="inherit" />
-            </MenuItem>
-          </a>
+          <MenuItem
+            component="a"
+            href="https://discord.gg/Baza8FXzzT"
+            target="_blank"
+            rel="noreferrer"
+            onClick={handleClose}
+            sx={{ color: '#FFFFFF', justifyContent: 'space-between' }}
+          >
+            <Typography>Discord</Typography>
+            <OpenInNewIcon fontSize="inherit" />
+          </MenuItem>
           <Link href="/termsofservice">
             <MenuItem onClick={handleClose} sx={{ color: '#FFFFFF' }}>
               Terms of Service
@@ -153,15 +155,17 @@ export const NavMenu = () => {
               <OpenInNewIcon fontSize="inherit" />
             </MenuItem>
           </a>
-          <a href="https://discord.gg/Baza8FXzzT" target="_blank" rel="noreferrer">
-            <MenuItem
-              onClick={handleClose}
-              sx={{ color: '#FFFFFF', justifyContent: 'space-between' }}
-            >
-              <Typography>Discord</Typography>
-              <OpenInNewIcon fontSize="inherit" />
-            </MenuItem>
-          </a>
+          <MenuItem
+            component="a"
+            href="https://discord.gg/Baza8FXzzT"
+            target="_blank"
+            rel="noreferrer"
+            onClick={handleClose}
+            sx={{ color: '#FFFFFF', justifyContent: 'space-between' }}
+          >
+            <Typography>Discord</Typography>
+            <OpenInNewIcon fontSize="inherit" />
+          </MenuItem>
           <Link href="/termsofservice">
             <MenuItem onClick={handleClose} sx={{ color: '#FFFFFF' }}>
               Terms of Service
